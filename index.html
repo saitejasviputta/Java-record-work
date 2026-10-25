@@ -1169,6 +1169,211 @@ public class OrderDemo {
         System.out.println("t3 alive: " + t3.isAlive());
     }
 }`,"One running\nTwo running\nThree running\nt1 alive: false\nt2 alive: false\nt3 alive: false","Create multiple threads and control their order with isAlive() and join().")]}
+,{t:"Multithreaded programming and lambda expressions",p:[
+P("Lab 1: Thread priorities (MIN, NORM, MAX)",`class Worker extends Thread {
+    Worker(String n) { super(n); }
+    public void run() { System.out.println(getName() + " priority = " + getPriority()); }
+}
+public class PriorityDemo {
+    public static void main(String[] args) {
+        Worker t1 = new Worker("Low"), t2 = new Worker("Normal"), t3 = new Worker("High");
+        t1.setPriority(Thread.MIN_PRIORITY);     // 1
+        t2.setPriority(Thread.NORM_PRIORITY);    // 5
+        t3.setPriority(Thread.MAX_PRIORITY);     // 10
+        t1.start(); t2.start(); t3.start();
+    }
+}`,"Low priority = 1\nNormal priority = 5\nHigh priority = 10\n(sample run: the order of the lines can differ)","Create multiple threads and demonstrate priorities using MIN_PRIORITY, NORM_PRIORITY and MAX_PRIORITY."),
+P("Lab 2: Three threads with different priorities",`class Task extends Thread {
+    Task(String n, int p) { super(n); setPriority(p); }
+    public void run() {
+        for (int i = 1; i <= 3; i++) System.out.println(getName() + " (priority " + getPriority() + ") step " + i);
+    }
+}
+public class OrderByPriority {
+    public static void main(String[] args) {
+        new Task("T-Low", 1).start();
+        new Task("T-Normal", 5).start();
+        new Task("T-High", 10).start();
+    }
+}`,"T-Low (priority 1) step 1\nT-High (priority 10) step 1\nT-Normal (priority 5) step 1\nT-High (priority 10) step 2\nT-High (priority 10) step 3\nT-Normal (priority 5) step 2\nT-Normal (priority 5) step 3\nT-Low (priority 1) step 2\nT-Low (priority 1) step 3\n(sample run: priority is only a hint to the scheduler, so the order changes from run to run)","Create three threads with different priorities and observe their execution order."),
+P("Lab 3: Synchronized method with a shared counter",`class Counter {
+    private int count = 0;
+    synchronized void increment() { count++; }     // one thread at a time
+    int get() { return count; }
+}
+public class SyncMethod {
+    public static void main(String[] args) throws InterruptedException {
+        Counter c = new Counter();
+        Thread t1 = new Thread(() -> { for (int i = 0; i < 1000; i++) c.increment(); });
+        Thread t2 = new Thread(() -> { for (int i = 0; i < 1000; i++) c.increment(); });
+        t1.start(); t2.start();
+        t1.join(); t2.join();
+        System.out.println("Final count: " + c.get());
+    }
+}`,"Final count: 2000","Use a synchronized method to access a shared counter."),
+P("Lab 4: Synchronized block",`class Counter {
+    private int count = 0;
+    private final Object lock = new Object();
+    void increment() {
+        synchronized (lock) { count++; }           // only this block is locked
+    }
+    int get() { return count; }
+}
+public class SyncBlock {
+    public static void main(String[] args) throws InterruptedException {
+        Counter c = new Counter();
+        Thread t1 = new Thread(() -> { for (int i = 0; i < 1000; i++) c.increment(); });
+        Thread t2 = new Thread(() -> { for (int i = 0; i < 1000; i++) c.increment(); });
+        t1.start(); t2.start();
+        t1.join(); t2.join();
+        System.out.println("Final count: " + c.get());
+    }
+}`,"Final count: 2000","Demonstrate synchronization using a synchronized block."),
+P("Lab 5: Race condition and its fix",`class UnsafeCounter {
+    int count = 0;
+    void increment() { count++; }                  // not atomic: read, add, write
+}
+class SafeCounter {
+    int count = 0;
+    synchronized void increment() { count++; }     // fixed with synchronized
+}
+public class RaceDemo {
+    public static void main(String[] args) throws InterruptedException {
+        UnsafeCounter u = new UnsafeCounter();
+        SafeCounter s = new SafeCounter();
+        Runnable r = () -> { for (int i = 0; i < 10000; i++) { u.increment(); s.increment(); } };
+        Thread t1 = new Thread(r), t2 = new Thread(r);
+        t1.start(); t2.start();
+        t1.join(); t2.join();
+        System.out.println("Without synchronization: " + u.count + " (expected 20000)");
+        System.out.println("With synchronization: " + s.count);
+    }
+}`,"Without synchronization: 15873 (expected 20000)\nWith synchronization: 20000\n(the first number changes on every run and is usually below 20000)","Demonstrate a race condition and eliminate it using synchronization."),
+P("Lab 6: Synchronized ticket-booking system",`class TicketCounter {
+    private int available = 5;
+    synchronized void book(String name, int n) {
+        if (n <= available) {
+            available -= n;
+            System.out.println(name + " booked " + n + " ticket(s). Left: " + available);
+        } else {
+            System.out.println(name + " could not book " + n + " ticket(s). Only " + available + " left");
+        }
+    }
+}
+class Customer extends Thread {
+    TicketCounter tc; int n;
+    Customer(TicketCounter tc, String name, int n) { super(name); this.tc = tc; this.n = n; }
+    public void run() { tc.book(getName(), n); }
+}
+public class TicketBooking {
+    public static void main(String[] args) {
+        TicketCounter tc = new TicketCounter();
+        new Customer(tc, "Asha", 2).start();
+        new Customer(tc, "Ravi", 2).start();
+        new Customer(tc, "Meena", 2).start();
+    }
+}`,"Asha booked 2 ticket(s). Left: 3\nRavi booked 2 ticket(s). Left: 1\nMeena could not book 2 ticket(s). Only 1 left\n(sample run: which customer misses out can change, but tickets are never over-booked)","Synchronized ticket-booking system where several threads book tickets at the same time."),
+P("Lab 7: Lambda expressions for arithmetic operations",`interface Operation { double apply(double a, double b); }    // functional interface
+public class LambdaOps {
+    public static void main(String[] args) {
+        Operation add = (a, b) -> a + b;
+        Operation sub = (a, b) -> a - b;
+        Operation mul = (a, b) -> a * b;
+        Operation div = (a, b) -> a / b;
+        System.out.println("Addition: " + add.apply(20, 4));
+        System.out.println("Subtraction: " + sub.apply(20, 4));
+        System.out.println("Multiplication: " + mul.apply(20, 4));
+        System.out.println("Division: " + div.apply(20, 4));
+    }
+}`,"Addition: 24.0\nSubtraction: 16.0\nMultiplication: 80.0\nDivision: 5.0","Introduce lambda expressions with a functional interface for addition, subtraction, multiplication and division."),
+P("Lab 8: Single and multiple parameter lambdas",`interface Square { int calc(int x); }
+interface Sum { int calc(int a, int b); }
+public class LambdaParams {
+    public static void main(String[] args) {
+        Square sq = x -> x * x;               // single parameter
+        Sum sum = (a, b) -> a + b;            // multiple parameters
+        System.out.println("Square of 6 = " + sq.calc(6));
+        System.out.println("Sum of 4 and 7 = " + sum.calc(4, 7));
+    }
+}`,"Square of 6 = 36\nSum of 4 and 7 = 11","Lambda expression with a single parameter and with multiple parameters."),
+P("Lab 9: Block lambda with multiple statements",`interface Calc { int run(int n); }
+public class BlockLambda {
+    public static void main(String[] args) {
+        Calc factorial = (n) -> {
+            System.out.println("Computing factorial of " + n);
+            int f = 1;
+            for (int i = 2; i <= n; i++) f *= i;
+            return f;
+        };
+        System.out.println("Factorial = " + factorial.run(5));
+    }
+}`,"Computing factorial of 5\nFactorial = 120","A block lambda expression containing multiple statements."),
+P("Lab 10: Block lambda to find the largest of two numbers",`interface Max { int find(int a, int b); }
+public class LargestLambda {
+    public static void main(String[] args) {
+        Max m = (a, b) -> {
+            if (a > b) return a;
+            else return b;
+        };
+        System.out.println("Largest = " + m.find(25, 40));
+    }
+}`,"Largest = 40","Use a block lambda to find the largest of two numbers and return it."),
+P("Lab 11: Generic functional interface",`interface Transformer<T> { T apply(T value); }
+public class GenericLambda {
+    public static void main(String[] args) {
+        Transformer<String> upper = s -> s.toUpperCase();
+        Transformer<Integer> square = n -> n * n;
+        Transformer<Double> half = d -> d / 2;
+        System.out.println(upper.apply("java"));
+        System.out.println(square.apply(7));
+        System.out.println(half.apply(5.0));
+    }
+}`,"JAVA\n49\n2.5","Create a generic functional interface and implement it with lambdas for different data types."),
+P("Lab 12: Generic functional interface with two values",`interface Operation<T> { T op(T a, T b); }
+public class GenericTwo {
+    public static void main(String[] args) {
+        Operation<Integer> add = (a, b) -> a + b;
+        Operation<String> join = (a, b) -> a + b;
+        Operation<Double> mul = (a, b) -> a * b;
+        System.out.println(add.op(10, 20));
+        System.out.println(join.op("Hello ", "Java"));
+        System.out.println(mul.op(2.5, 4.0));
+    }
+}`,"30\nHello Java\n10.0","Generic functional interface that accepts two values and performs an operation using a lambda."),
+P("Lab 13: Display and filter an ArrayList",`import java.util.*;
+public class ListLambda {
+    public static void main(String[] args) {
+        ArrayList<Integer> nums = new ArrayList<>(Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9, 10));
+        System.out.print("All numbers: ");
+        nums.forEach(n -> System.out.print(n + " "));
+        System.out.println();
+        System.out.print("Even numbers: ");
+        nums.stream().filter(n -> n % 2 == 0).forEach(n -> System.out.print(n + " "));
+        System.out.println();
+    }
+}`,"All numbers: 1 2 3 4 5 6 7 8 9 10\nEven numbers: 2 4 6 8 10","Use lambda expressions to display and filter the elements of an ArrayList."),
+P("Lab 14: Sort integers and strings with lambdas",`import java.util.*;
+public class SortLambda {
+    public static void main(String[] args) {
+        ArrayList<Integer> nums = new ArrayList<>(Arrays.asList(5, 2, 9, 1, 7));
+        nums.sort((a, b) -> Integer.compare(a, b));
+        System.out.println("Integers ascending: " + nums);
+        nums.sort((a, b) -> Integer.compare(b, a));
+        System.out.println("Integers descending: " + nums);
+        ArrayList<String> names = new ArrayList<>(Arrays.asList("Meena", "Asha", "Kiran", "Ravi"));
+        names.sort((a, b) -> a.compareTo(b));
+        System.out.println("Strings sorted: " + names);
+    }
+}`,"Integers ascending: [1, 2, 5, 7, 9]\nIntegers descending: [9, 7, 5, 2, 1]\nStrings sorted: [Asha, Kiran, Meena, Ravi]","Sort a list of integers and a list of strings using lambda expressions."),
+P("Lab 15: Thread using a lambda expression",`public class LambdaThread {
+    public static void main(String[] args) throws InterruptedException {
+        Thread t = new Thread(() ->
+            System.out.println("Thread running: " + Thread.currentThread().getName()));
+        t.start();
+        t.join();
+        System.out.println("Main finished");
+    }
+}`,"Thread running: Thread-0\nMain finished","Create and execute a thread using a lambda expression.")]}
 ];
 const nav=document.getElementById('nav'),root=document.getElementById('w');
 W.forEach((w,i)=>{nav.insertAdjacentHTML('beforeend',`<a href="#wk${i+1}">Week ${i+1}</a>`);
